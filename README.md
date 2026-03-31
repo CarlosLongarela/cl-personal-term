@@ -21,12 +21,12 @@ alias ls="eza --icons"
 alias ll="eza -lah --icons"
 alias tree="eza --tree"
 alias bat="batcat"   # auto-detected: batcat on Debian/Ubuntu, bat elsewhere
-alias he="show-help"  # quick reference cheatsheet
+alias h="show-help"  # quick reference cheatsheet
 ```
 
-## Quick reference (`he`)
+## Quick reference (`h`)
 
-Type `he` in any terminal to display a colour-coded cheatsheet of the most useful shortcuts, organised by tool:
+Type `h` in any terminal to display a colour-coded cheatsheet of the most useful shortcuts, organised by tool:
 
 - **tmux** — prefix, windows, panes, scroll mode
 - **bash** — history search, cursor shortcuts

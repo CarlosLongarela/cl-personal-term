@@ -277,7 +277,7 @@ alias ls="eza --icons"
 alias ll="eza -lah --icons"
 alias tree="eza --tree"
 alias bat="$BAT_CMD"
-alias he="show-help"
+alias h="show-help"
 
 # ── zoxide (replaces cd) ──────────────────────
 eval "\$(zoxide init bash)"
