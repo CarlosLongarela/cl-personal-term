@@ -1,0 +1,40 @@
+add_newline = false
+
+format = """
+$hostname$localip$time⇒ $directory
+[ ](bright-green) $username$character
+"""
+
+[time]
+disabled = false
+format = "[  ]($style)[$time]($style) "
+time_format = "%Y-%m-%d %H:%M"
+style = "yellow"
+
+[localip]
+ssh_only = false
+format = "[\\($localipv4\\)](bold yellow) "
+style = "cyan"
+disabled = false
+
+[username]
+show_always = true
+format = "[$user]($style) "
+style_user = "bright-blue"
+style_root = "red bold"
+
+[hostname]
+ssh_only = false
+format = "[  ](bright-blue)[  $hostname ]($style)"
+style = "green"
+
+[directory]
+truncation_length = 3
+style = "purple"
+read_only = '🔒'
+read_only_style = 'red'
+home_symbol = '~'
+
+[character]
+success_symbol = "[❯](green)[❯](bright-green)"
+error_symbol = "[❯](red)[❯](bright-red)"
