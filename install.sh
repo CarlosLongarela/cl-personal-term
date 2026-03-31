@@ -194,6 +194,18 @@ if $INSTALL_TMUX; then
     fi
 fi
 
+# ── Deploy show-help ──────────────────────────
+info "Deploying show-help to ~/.local/bin..."
+SHOW_HELP_DST="$HOME/.local/bin/show-help"
+if ! $DRY_RUN; then
+    mkdir -p "$HOME/.local/bin"
+    curl -sSfL "$REPO_RAW/show-help" -o "$SHOW_HELP_DST"
+    chmod +x "$SHOW_HELP_DST"
+    success "show-help deployed and made executable."
+else
+    dryrun "Would deploy show-help to $SHOW_HELP_DST and chmod +x"
+fi
+
 # ── Detect bat command name ───────────────────
 # On Debian/Ubuntu apt installs bat as 'batcat' to avoid a name collision.
 # If bat is already on PATH use it directly; otherwise fall back to batcat.
@@ -265,6 +277,7 @@ alias ls="eza --icons"
 alias ll="eza -lah --icons"
 alias tree="eza --tree"
 alias bat="$BAT_CMD"
+alias h="show-help"
 
 # ── zoxide (replaces cd) ──────────────────────
 eval "\$(zoxide init bash)"

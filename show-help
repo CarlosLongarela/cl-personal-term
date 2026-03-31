@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+# ── Colors ───────────────────────────────────────
+RESET="\e[0m"
+BOLD="\e[1m"
+DIM="\e[2m"
+CYAN="\e[36m"
+YELLOW="\e[33m"
+GREEN="\e[32m"
+MAGENTA="\e[35m"
+BLUE="\e[34m"
+WHITE="\e[97m"
+
+section() {
+    echo ""
+    echo -e "  ${BOLD}${CYAN}$1${RESET}"
+    echo -e "  ${DIM}────────────────────────────────${RESET}"
+}
+
+row() {
+    local key="$1"
+    local desc="$2"
+    printf "  ${BOLD}${YELLOW}%-20s${RESET}  ${WHITE}%s${RESET}\n" "$key" "$desc"
+}
+
+echo ""
+echo -e "  ${BOLD}${MAGENTA}  Quick Reference${RESET}  ${DIM}(h to show again)${RESET}"
+
+# ── tmux ─────────────────────────────────────────
+section " tmux  (prefix: Ctrl+A)"
+row "Ctrl+A  1"        "Ventana 1 (local)"
+row "Ctrl+A  2"        "Ventana 2 (remote)"
+row "Ctrl+A  c"        "Nueva ventana"
+row "Ctrl+A  ,"        "Renombrar ventana"
+row "Ctrl+A  n / p"    "Siguiente / anterior ventana"
+row "Ctrl+A  %"        "Split vertical"
+row 'Ctrl+A  "'        "Split horizontal"
+row "Ctrl+A  flechas"  "Moverse entre paneles"
+row "Ctrl+A  d"        "Detach sesión"
+row "Ctrl+A  ["        "Modo scroll (q para salir)"
+
+# ── Bash ─────────────────────────────────────────
+section " bash"
+row "Ctrl+R"           "Búsqueda en historial (fzf)"
+row "Ctrl+C"           "Cancelar comando"
+row "Ctrl+L"           "Limpiar pantalla"
+row "Ctrl+A / E"       "Inicio / fin de línea"
+row "Ctrl+U"           "Borrar línea completa"
+row "Ctrl+W"           "Borrar palabra anterior"
+row "Alt+."            "Último argumento del comando anterior"
+
+# ── zoxide ───────────────────────────────────────
+section "󰋞 zoxide"
+row "z <dir>"          "Ir a directorio (fuzzy)"
+row "z -"              "Directorio anterior"
+row "zi"               "Selección interactiva con fzf"
+
+# ── fzf ──────────────────────────────────────────
+section " fzf"
+row "Ctrl+R"           "Búsqueda en historial"
+row "Ctrl+T"           "Buscar fichero y pegarlo"
+row "Alt+C"            "Cambiar directorio con fuzzy"
+row "** + Tab"         "Completar rutas/comandos"
+
+# ── Aliases ──────────────────────────────────────
+section " aliases"
+row "ls"               "eza --icons"
+row "ll"               "eza -lah --icons (detalle)"
+row "tree"             "eza --tree"
+row "bat <file>"       "cat con syntax highlighting"
+
+echo ""
