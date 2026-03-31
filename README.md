@@ -21,7 +21,18 @@ alias ls="eza --icons"
 alias ll="eza -lah --icons"
 alias tree="eza --tree"
 alias bat="batcat"   # auto-detected: batcat on Debian/Ubuntu, bat elsewhere
+alias h="show-help"  # quick reference cheatsheet
 ```
+
+## Quick reference (`h`)
+
+Type `h` in any terminal to display a colour-coded cheatsheet of the most useful shortcuts, organised by tool:
+
+- **tmux** — prefix, windows, panes, scroll mode
+- **bash** — history search, cursor shortcuts
+- **zoxide** — fuzzy directory navigation
+- **fzf** — file and history fuzzy search
+- **aliases** — all configured shortcuts
 
 ---
 
@@ -110,6 +121,7 @@ Installation steps:
 | `starship.toml` | `~/.config/starship.toml` |
 | `.tmux.conf` | `~/.tmux.conf` |
 | `tmux-start` | `~/.local/bin/tmux-start` (chmod +x) |
+| `show-help` | `~/.local/bin/show-help` (chmod +x) |
 
 If either file already exists it is backed up with a `.bak` extension before being overwritten.
 
@@ -124,6 +136,9 @@ curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/ma
 
 curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/tmux-start \
     -o ~/.local/bin/tmux-start && chmod +x ~/.local/bin/tmux-start
+
+curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/show-help \
+    -o ~/.local/bin/show-help && chmod +x ~/.local/bin/show-help
 ```
 
 ---
