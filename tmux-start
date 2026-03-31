@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+SESSION="main"
+
+# Si la sesión ya existe → conectarse
+tmux has-session -t $SESSION 2>/dev/null
+
+if [ $? != 0 ]; then
+    # crear sesión con primera ventana
+    tmux new-session -d -s $SESSION -n local
+
+    # crear segunda ventana
+    tmux new-window -t $SESSION:2 -n remote
+
+    # ir a la primera
+    tmux select-window -t $SESSION:1
+fi
+
+# conectarse
+tmux attach -t $SESSION

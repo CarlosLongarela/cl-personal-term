@@ -53,23 +53,15 @@ bash <(curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-
 
 ## tmux
 
-The script deploys `.tmux.conf` to `~/.tmux.conf` and adds an auto-start snippet to `.bashrc`:
+The script deploys `.tmux.conf` to `~/.tmux.conf`, installs `tmux-start` as an executable in `~/.local/bin/`, and adds an auto-start call to `.bashrc`:
 
 ```bash
-tmux-start() {
-    if tmux has-session 2>/dev/null; then
-        tmux attach-session -t 0
-    else
-        tmux new-session
-    fi
-}
-
 if [ -z "$TMUX" ]; then
     tmux-start
 fi
 ```
 
-Every new interactive shell will automatically attach to an existing tmux session or create a new one. This is skipped when already inside tmux (e.g. nested sessions via SSH).
+`tmux-start` creates a named session `main` with two windows (`local` and `remote`), or attaches to it if it already exists. Every new interactive shell will attach automatically. This is skipped when already inside tmux (e.g. nested sessions via SSH).
 
 ### tmux key bindings (from `.tmux.conf`)
 
@@ -117,6 +109,7 @@ Installation steps:
 |------|-------------|
 | `starship.toml` | `~/.config/starship.toml` |
 | `.tmux.conf` | `~/.tmux.conf` |
+| `tmux-start` | `~/.local/bin/tmux-start` (chmod +x) |
 
 If either file already exists it is backed up with a `.bak` extension before being overwritten.
 
@@ -128,6 +121,9 @@ curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/ma
 
 curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/.tmux.conf \
     -o ~/.tmux.conf
+
+curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/tmux-start \
+    -o ~/.local/bin/tmux-start && chmod +x ~/.local/bin/tmux-start
 ```
 
 ---

@@ -10,6 +10,9 @@ set -euo pipefail
 #    bash install.sh            # normal install
 #    bash install.sh --dry-run  # preview changes without applying them
 #
+#  During installation you will be asked whether to install tmux (default: N).
+#  Skip tmux on remote servers where you rely on a local terminal multiplexer.
+#
 #  NOTE: starship and zoxide are installed by piping remote scripts to bash.
 #  This is the upstream-recommended method. If you prefer to verify the scripts
 #  manually before executing, download them first:
@@ -46,6 +49,18 @@ run() {
 }
 
 $DRY_RUN && warning "Running in dry-run mode — no changes will be made.\n"
+
+# ── tmux prompt ──────────────────────────────
+# Default N — skip on remote servers where the local terminal handles multiplexing.
+INSTALL_TMUX=false
+echo -e "${BOLD}Install tmux + tmux-start? [y/N]:${RESET} \c"
+read -r tmux_answer </dev/tty
+[[ "${tmux_answer,,}" == "y" ]] && INSTALL_TMUX=true
+if $INSTALL_TMUX; then
+    info "tmux will be installed."
+else
+    info "Skipping tmux installation."
+fi
 
 # ── Config ───────────────────────────────────
 REPO_RAW="https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main"
@@ -92,7 +107,7 @@ install_pkg() {
 install_pkg bash-completion
 install_pkg bat
 install_pkg fzf
-install_pkg tmux
+$INSTALL_TMUX && install_pkg tmux
 
 # ── Install zoxide ────────────────────────────
 info "Installing zoxide..."
@@ -152,18 +167,31 @@ else
     dryrun "Would deploy starship.toml to $TOML_DST"
 fi
 
-# ── Deploy .tmux.conf ─────────────────────────
-info "Configuring tmux..."
-TMUX_DST="$HOME/.tmux.conf"
-if ! $DRY_RUN; then
-    if [ -f "$TMUX_DST" ]; then
-        warning "~/.tmux.conf already exists — backing up to .tmux.conf.bak"
-        cp "$TMUX_DST" "${TMUX_DST}.bak"
+# ── Deploy .tmux.conf and tmux-start ─────────
+if $INSTALL_TMUX; then
+    info "Configuring tmux..."
+    TMUX_DST="$HOME/.tmux.conf"
+    if ! $DRY_RUN; then
+        if [ -f "$TMUX_DST" ]; then
+            warning "~/.tmux.conf already exists — backing up to .tmux.conf.bak"
+            cp "$TMUX_DST" "${TMUX_DST}.bak"
+        fi
+        curl -sSfL "$REPO_RAW/.tmux.conf" -o "$TMUX_DST"
+        success ".tmux.conf deployed."
+    else
+        dryrun "Would deploy .tmux.conf to $TMUX_DST"
     fi
-    curl -sSfL "$REPO_RAW/.tmux.conf" -o "$TMUX_DST"
-    success ".tmux.conf deployed."
-else
-    dryrun "Would deploy .tmux.conf to $TMUX_DST"
+
+    info "Deploying tmux-start to ~/.local/bin..."
+    TMUX_START_DST="$HOME/.local/bin/tmux-start"
+    if ! $DRY_RUN; then
+        mkdir -p "$HOME/.local/bin"
+        curl -sSfL "$REPO_RAW/tmux-start" -o "$TMUX_START_DST"
+        chmod +x "$TMUX_START_DST"
+        success "tmux-start deployed and made executable."
+    else
+        dryrun "Would deploy tmux-start to $TMUX_START_DST and chmod +x"
+    fi
 fi
 
 # ── Detect bat command name ───────────────────
@@ -218,6 +246,7 @@ if $DRY_RUN; then
     dryrun "  bat alias      → $BAT_CMD"
     dryrun "  fzf keybindings→ ${FZF_KEYBINDINGS:-not found, skipped}"
     dryrun "  fzf completion → ${FZF_COMPLETION:-not found, skipped}"
+    dryrun "  tmux auto-start→ $($INSTALL_TMUX && echo "yes" || echo "no (skipped)")"
 else
     # ── Static opening block ──────────────────
     cat >> "$BASHRC" << EOF
@@ -259,21 +288,19 @@ source "$FZF_COMPLETION"
 EOF
     fi
 
-    # ── tmux + starship: no variable expansion needed ──
-    cat >> "$BASHRC" << 'EOF'
+    # ── tmux auto-start (only if tmux was installed) ──
+    if $INSTALL_TMUX; then
+        cat >> "$BASHRC" << 'EOF'
 
-# ── tmux ──────────────────────────────────────
-tmux-start() {
-    if tmux has-session 2>/dev/null; then
-        tmux attach-session -t 0
-    else
-        tmux new-session
-    fi
-}
-
+# ── tmux auto-start ───────────────────────────
 if [ -z "$TMUX" ]; then
     tmux-start
 fi
+EOF
+    fi
+
+    # ── Starship prompt ───────────────────────────
+    cat >> "$BASHRC" << 'EOF'
 
 # ── Starship prompt ───────────────────────────
 eval "$(starship init bash)"
@@ -296,7 +323,7 @@ if ! $DRY_RUN; then
     command -v zoxide   &>/dev/null && echo -e "  zoxide    $(zoxide --version)"                       || \
         { [ -x "$HOME/.local/bin/zoxide" ] && echo -e "  zoxide    $("$HOME/.local/bin/zoxide" --version)"; } || \
         echo -e "  zoxide    ${RED}not found${RESET}"
-    command -v tmux     &>/dev/null && echo -e "  tmux      $(tmux -V)"                               || echo -e "  tmux      ${RED}not found${RESET}"
+    $INSTALL_TMUX && { command -v tmux &>/dev/null && echo -e "  tmux      $(tmux -V)" || echo -e "  tmux      ${RED}not found${RESET}"; }
     echo -e "${BOLD}────────────────────────────────────────────────${RESET}"
     echo ""
 fi
