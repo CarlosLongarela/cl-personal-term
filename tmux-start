@@ -1,20 +1,14 @@
 #!/usr/bin/env bash
 
+# evitar anidar tmux
+[ -n "$TMUX" ] && exit 0
+
 SESSION="main"
 
-# Si la sesión ya existe → conectarse
-tmux has-session -t $SESSION 2>/dev/null
-
-if [ $? != 0 ]; then
-    # crear sesión con primera ventana
-    tmux new-session -d -s $SESSION -n local
-
-    # crear segunda ventana
-    tmux new-window -t $SESSION:2 -n remote
-
-    # ir a la primera
-    tmux select-window -t $SESSION:1
+if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+	tmux new-session -d -s "$SESSION" -n local
+	tmux new-window -t "$SESSION":2 -n remote
+	tmux select-window -t "$SESSION":1
 fi
 
-# conectarse (attach si existe, crear si no)
-tmux new-session -A -s $SESSION
+exec tmux attach-session -t "$SESSION"
