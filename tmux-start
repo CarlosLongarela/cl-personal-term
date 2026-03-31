@@ -16,5 +16,5 @@ if [ $? != 0 ]; then
     tmux select-window -t $SESSION:1
 fi
 
-# conectarse
-tmux attach -t $SESSION
+# conectarse (attach si existe, crear si no)
+tmux new-session -A -s $SESSION
