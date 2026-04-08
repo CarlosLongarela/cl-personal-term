@@ -1,46 +1,338 @@
-add_newline = false
+"$schema" = 'https://starship.rs/config-schema.json'
 
 format = """
-$hostname${custom.ip_info}$time⇒ $directory
-[ ](bright-green) $username$character
-"""
+[](red)\
+$os\
+$username\
+[](bg:peach fg:red)\
+$directory\
+[](bg:yellow fg:peach)\
+$git_branch\
+$git_status\
+[](fg:yellow bg:green)\
+$c\
+$rust\
+$golang\
+$nodejs\
+$php\
+$java\
+$kotlin\
+$haskell\
+$python\
+[](fg:green bg:sapphire)\
+$docker_context\
+$conda\
+[](fg:sapphire bg:lavender)\
+$time\
+[](fg:lavender)\
+[](fg:lavender)\
+$cmd_duration\
+$line_break\
+${custom.hostinfo_local}${custom.hostinfo_external}\
+$character"""
 
-[time]
+palette = 'catppuccin_mocha'
+
+# --- Prompt ---
+
+[line_break]
 disabled = false
-format = "[  ]($style)[$time]($style) "
-time_format = "%Y-%m-%d %H:%M"
-style = "yellow"
+
+[character]
+disabled = false
+success_symbol = '[❯](bold fg:green)'
+error_symbol = '[❯](bold fg:red)'
+vimcmd_symbol = '[❮](bold fg:green)'
+vimcmd_replace_one_symbol = '[❮](bold fg:lavender)'
+vimcmd_replace_symbol = '[❮](bold fg:lavender)'
+vimcmd_visual_symbol = '[❮](bold fg:yellow)'
+
+# --- OS & User ---
+
+[os]
+disabled = false
+style = "bg:red fg:crust"
+
+[os.symbols]
+Windows = "󰍲"
+Ubuntu = "󰕈"
+SUSE = ""
+Raspbian = "󰐿"
+Mint = "󰣭"
+Macos = "󰀵"
+Manjaro = ""
+Linux = "󰌽"
+Gentoo = "󰣨"
+Fedora = "󰣛"
+Alpine = ""
+Amazon = ""
+Android = ""
+AOSC = ""
+Arch = "󰣇"
+Artix = "󰣇"
+EndeavourOS = ""
+CentOS = ""
+Debian = "󰣚"
+Redhat = "󱄛"
+RedHatEnterprise = "󱄛"
+Pop = ""
 
 [username]
 show_always = true
-format = "[$user]($style) "
-style_user = "bright-blue"
-style_root = "red bold"
+style_user = "bg:red fg:crust"
+style_root = "bg:red fg:crust"
+format = '[ $user]($style)'
 
-[hostname]
-ssh_only = false
-format = "[  ](bright-blue)[  $hostname ]($style)"
-style = "green"
+# --- Directory ---
 
 [directory]
+style = "bg:peach fg:crust"
+format = "[ $path ]($style)"
 truncation_length = 3
-style = "purple"
-read_only = '🔒'
-read_only_style = 'red'
-home_symbol = '~'
+truncation_symbol = "…/"
 
-[character]
-success_symbol = "[❯](green)[❯](bright-green)"
-error_symbol = "[❯](red)[❯](bright-red)"
+[directory.substitutions]
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = "󰖚 "
+"Pictures" = " "
+"Developer" = " "
 
-[custom.ip_info]
+
+# --- Git ---
+
+[git_branch]
+symbol = ""
+style = "bg:yellow"
+format = '[[ $symbol $branch ](fg:crust bg:yellow)]($style)'
+
+[git_status]
+style = "bg:yellow"
+format = '[[($all_status$ahead_behind )](fg:crust bg:yellow)]($style)'
+
+# --- Languages ---
+
+[nodejs]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[c]
+symbol = " "
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[rust]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[golang]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[php]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[java]
+symbol = " "
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[kotlin]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[haskell]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
+
+[python]
+symbol = ""
+style = "bg:green"
+format = '[[ $symbol( $version)(\(#$virtualenv\)) ](fg:crust bg:green)]($style)'
+
+# --- Containers ---
+
+[docker_context]
+symbol = ""
+style = "bg:sapphire"
+format = '[[ $symbol( $context) ](fg:crust bg:sapphire)]($style)'
+
+[conda]
+symbol = "  "
+style = "fg:crust bg:sapphire"
+format = '[$symbol$environment ]($style)'
+ignore_base = false
+
+# --- Time ---
+
+[time]
+disabled = false
+time_format = "%d/%m/%Y %R"
+style = "bg:lavender"
+format = '[[   $time ](fg:crust bg:lavender)]($style)'
+
+# --- Hostname & IP (custom module) ---
+# Shows 🏠 for local/private IPs or 🌍 for public/external IPs
+# Format: icon hostname (IP)
+
+[custom.hostinfo_local]
+description = "Hostname and IP - Local"
 command = '''
-ip=$(hostname -I | awk '{print $1}')
-if [[ $ip == 127.* || $ip == 10.* || $ip == 192.168.* || $ip == 172.1[6-9].* || $ip == 172.2[0-9].* || $ip == 172.3[0-1].* ]]; then
-    printf "🏠 \x1b[1;33m(%s)\x1b[0m" "$ip"
-else
-    printf "🌐 \x1b[31m(%s)\x1b[0m" "$ip"
-fi
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$IP" ] && IP=$(ipconfig getifaddr en0 2>/dev/null)
+HOST=$(hostname -s 2>/dev/null || hostname)
+case "$IP" in
+    10.*|172.1[6-9].*|172.2[0-9].*|172.3[0-1].*|192.168.*|127.*) echo "🏠 $HOST ($IP)" ;;
+esac
 '''
-when = "true"
-format = "[$output](none) "
+format = '[[$output](fg:yellow)]($style)'
+style = ""
+when = true
+shell = ["bash", "--noprofile", "--norc"]
+
+[custom.hostinfo_external]
+description = "Hostname and IP - External"
+command = '''
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$IP" ] && IP=$(ipconfig getifaddr en0 2>/dev/null)
+HOST=$(hostname -s 2>/dev/null || hostname)
+case "$IP" in
+    10.*|172.1[6-9].*|172.2[0-9].*|172.3[0-1].*|192.168.*|127.*) ;;
+    *) echo "🌍 $HOST ($IP)" ;;
+esac
+'''
+format = '[[$output ](fg:#ff3030)]($style)'
+style = ""
+when = true
+shell = ["bash", "--noprofile", "--norc"]
+
+# --- Command duration ---
+
+[cmd_duration]
+show_milliseconds = true
+format = " in $duration "
+style = "bg:lavender"
+disabled = false
+show_notifications = true
+min_time_to_notify = 45000
+
+# --- Color Palettes ---
+
+[palettes.catppuccin_mocha]
+rosewater = "#f5e0dc"
+flamingo = "#f2cdcd"
+pink = "#f5c2e7"
+mauve = "#cba6f7"
+red = "#f38ba8"
+maroon = "#eba0ac"
+peach = "#fab387"
+yellow = "#f9e2af"
+green = "#a6e3a1"
+teal = "#94e2d5"
+sky = "#89dceb"
+sapphire = "#74c7ec"
+blue = "#89b4fa"
+lavender = "#b4befe"
+text = "#cdd6f4"
+subtext1 = "#bac2de"
+subtext0 = "#a6adc8"
+overlay2 = "#9399b2"
+overlay1 = "#7f849c"
+overlay0 = "#6c7086"
+surface2 = "#585b70"
+surface1 = "#45475a"
+surface0 = "#313244"
+base = "#1e1e2e"
+mantle = "#181825"
+crust = "#11111b"
+
+[palettes.catppuccin_frappe]
+rosewater = "#f2d5cf"
+flamingo = "#eebebe"
+pink = "#f4b8e4"
+mauve = "#ca9ee6"
+red = "#e78284"
+maroon = "#ea999c"
+peach = "#ef9f76"
+yellow = "#e5c890"
+green = "#a6d189"
+teal = "#81c8be"
+sky = "#99d1db"
+sapphire = "#85c1dc"
+blue = "#8caaee"
+lavender = "#babbf1"
+text = "#c6d0f5"
+subtext1 = "#b5bfe2"
+subtext0 = "#a5adce"
+overlay2 = "#949cbb"
+overlay1 = "#838ba7"
+overlay0 = "#737994"
+surface2 = "#626880"
+surface1 = "#51576d"
+surface0 = "#414559"
+base = "#303446"
+mantle = "#292c3c"
+crust = "#232634"
+
+[palettes.catppuccin_latte]
+rosewater = "#dc8a78"
+flamingo = "#dd7878"
+pink = "#ea76cb"
+mauve = "#8839ef"
+red = "#d20f39"
+maroon = "#e64553"
+peach = "#fe640b"
+yellow = "#df8e1d"
+green = "#40a02b"
+teal = "#179299"
+sky = "#04a5e5"
+sapphire = "#209fb5"
+blue = "#1e66f5"
+lavender = "#7287fd"
+text = "#4c4f69"
+subtext1 = "#5c5f77"
+subtext0 = "#6c6f85"
+overlay2 = "#7c7f93"
+overlay1 = "#8c8fa1"
+overlay0 = "#9ca0b0"
+surface2 = "#acb0be"
+surface1 = "#bcc0cc"
+surface0 = "#ccd0da"
+base = "#eff1f5"
+mantle = "#e6e9ef"
+crust = "#dce0e8"
+
+[palettes.catppuccin_macchiato]
+rosewater = "#f4dbd6"
+flamingo = "#f0c6c6"
+pink = "#f5bde6"
+mauve = "#c6a0f6"
+red = "#ed8796"
+maroon = "#ee99a0"
+peach = "#f5a97f"
+yellow = "#eed49f"
+green = "#a6da95"
+teal = "#8bd5ca"
+sky = "#91d7e3"
+sapphire = "#7dc4e4"
+blue = "#8aadf4"
+lavender = "#b7bdf8"
+text = "#cad3f5"
+subtext1 = "#b8c0e0"
+subtext0 = "#a5adcb"
+overlay2 = "#939ab7"
+overlay1 = "#8087a2"
+overlay0 = "#6e738d"
+surface2 = "#5b6078"
+surface1 = "#494d64"
+surface0 = "#363a4f"
+base = "#24273a"
+mantle = "#1e2030"
+crust = "#181926"
