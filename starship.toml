@@ -31,7 +31,12 @@ $line_break\
 ${custom.hostinfo_local}${custom.hostinfo_external}\
 $character"""
 
-palette = 'catppuccin_mocha'
+# --- Palettes ---
+# catppuccin_mocha Default
+# catppuccin_frappe
+# catppuccin_latte
+# catppuccin_macchiato
+palette = 'catppuccin_latte'
 
 # --- Prompt ---
 
@@ -80,7 +85,7 @@ Pop = ""
 [username]
 show_always = true
 style_user = "bg:red fg:crust"
-style_root = "bg:red fg:crust"
+style_root = "bg:red fg:crust bold"
 format = '[ $user]($style)'
 
 # --- Directory ---
