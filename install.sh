@@ -34,6 +34,12 @@ warning() { echo -e "${YELLOW}[WARN]${RESET}     $*"; }
 error()   { echo -e "${RED}[ERROR]${RESET}    $*" >&2; exit 1; }
 dryrun()  { echo -e "${YELLOW}[DRY-RUN]${RESET}  $*"; }
 
+trap 'echo -e "${RED}[ERROR]${RESET}    Failed at line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
+
+APT_INSTALLED=()
+APT_UPDATED=()
+APT_UPTODATE=()
+
 # ── Dry-run flag ─────────────────────────────
 DRY_RUN=false
 for arg in "$@"; do
@@ -174,12 +180,15 @@ update_package_index() {
 
 # ── Update package index ─────────────────────
 update_package_index "$PKG_UPDATE"
+info "Package index ready. Checking requested packages..."
 
 # ── Install apt packages ─────────────────────
 install_pkg() {
     local name="$1"
     local installed_ver=""
     local candidate_ver=""
+
+    info "Checking package '${name}'..."
 
     installed_ver="$(dpkg-query -W -f='${Version}' "$name" 2>/dev/null || true)"
     candidate_ver="$(apt-cache policy "$name" 2>/dev/null | awk '/Candidate:/ {print $2; exit}')"
@@ -191,6 +200,7 @@ install_pkg() {
         else
             $PKG_INSTALL "$name"
         fi
+        APT_INSTALLED+=("$name")
         return
     fi
 
@@ -201,8 +211,10 @@ install_pkg() {
         else
             $PKG_INSTALL --only-upgrade "$name"
         fi
+        APT_UPDATED+=("$name")
     else
         success "${name} already up to date (${installed_ver})."
+        APT_UPTODATE+=("$name")
     fi
 }
 
@@ -532,8 +544,8 @@ if ! $DRY_RUN; then
     
     if command -v zoxide &>/dev/null; then
         echo -e "  ${GREEN}✓${RESET} zoxide    $(zoxide --version)"
-    elif [ -x \"$HOME/.local/bin/zoxide\" ]; then
-        echo -e \"  ${GREEN}✓${RESET} zoxide    $($HOME/.local/bin/zoxide --version)\"
+    elif [ -x "$HOME/.local/bin/zoxide" ]; then
+        echo -e "  ${GREEN}✓${RESET} zoxide    $($HOME/.local/bin/zoxide --version)"
     else
         echo -e "  ${RED}✗${RESET} zoxide    not found (installation failed)"
         INSTALL_FAILED=1
@@ -549,32 +561,41 @@ if ! $DRY_RUN; then
     fi
     
     # Optional: tmux
-    if [ \"$INSTALL_TMUX\" = true ]; then
+    if [ "$INSTALL_TMUX" = true ]; then
         if command -v tmux &>/dev/null; then
-            echo -e \"  ${GREEN}✓${RESET} tmux      $(tmux -V)\"
+            echo -e "  ${GREEN}✓${RESET} tmux      $(tmux -V)"
         else
-            echo -e \"  ${RED}✗${RESET} tmux      not found (installation failed)\"
+            echo -e "  ${RED}✗${RESET} tmux      not found (installation failed)"
             INSTALL_FAILED=1
         fi
     fi
     
     # Optional: starship config
-    if [ -f \"$HOME/.config/starship.toml\" ]; then
-        echo -e \"  ${GREEN}✓${RESET} starship.toml deployed\"
+    if [ -f "$HOME/.config/starship.toml" ]; then
+        echo -e "  ${GREEN}✓${RESET} starship.toml deployed"
     else
-        echo -e \"  ${YELLOW}!${RESET} starship.toml not found (may be using defaults)\"
+        echo -e "  ${YELLOW}!${RESET} starship.toml not found (may be using defaults)"
     fi
     
-    echo -e \"${BOLD}──────────────────────────────────────────────${RESET}\"
+    echo -e "${BOLD}──────────────────────────────────────────────${RESET}"
     
     if [ $INSTALL_FAILED -eq 1 ]; then
-        echo \"\"
-        warning \"Some tools failed to install. Please review the output above.\"
+        echo ""
+        warning "Some tools failed to install. Please review the output above."
     else
-        echo \"\"
-        success \"All core tools installed and validated successfully!\"
+        echo ""
+        success "All core tools installed and validated successfully!"
     fi
-    echo \"\"
+    echo ""
 fi
 
-success \"All done! Run 'source ~/.bashrc' or open a new terminal to apply changes.\"
+success "All done! Run 'source ~/.bashrc' or open a new terminal to apply changes."
+
+if ! $DRY_RUN; then
+    echo ""
+    echo -e "${BOLD}─── apt package summary ──────────────────────${RESET}"
+    [ ${#APT_INSTALLED[@]} -gt 0 ] && echo "  installed:  ${APT_INSTALLED[*]}" || echo "  installed:  none"
+    [ ${#APT_UPDATED[@]} -gt 0 ]   && echo "  updated:    ${APT_UPDATED[*]}"   || echo "  updated:    none"
+    [ ${#APT_UPTODATE[@]} -gt 0 ]  && echo "  up-to-date: ${APT_UPTODATE[*]}"  || echo "  up-to-date: none"
+    echo -e "${BOLD}──────────────────────────────────────────────${RESET}"
+fi
