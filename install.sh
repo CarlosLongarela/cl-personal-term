@@ -141,13 +141,39 @@ require_cmd() {
 }
 require_cmd curl
 
+update_package_index() {
+    local update_cmd="$1"
+    local out=""
+    local status=0
+
+    info "Updating package index..."
+    if $DRY_RUN; then
+        dryrun "Would run: $update_cmd"
+        return 0
+    fi
+
+    set +e
+    out="$($update_cmd 2>&1)"
+    status=$?
+    set -e
+
+    echo "$out"
+
+    if [ $status -eq 0 ]; then
+        return 0
+    fi
+
+    if echo "$out" | grep -Eiq 'NO_PUBKEY|GPG error|signatures couldn.t be verified|Some index files failed to download'; then
+        warning "apt update reported signature issues in external repositories."
+        warning "Continuing using existing package indexes for available repositories."
+        return 0
+    fi
+
+    error "Package index update failed. Resolve apt errors and retry."
+}
+
 # ── Update package index ─────────────────────
-info "Updating package index..."
-if $DRY_RUN; then
-    dryrun "Would run: $PKG_UPDATE"
-else
-    $PKG_UPDATE
-fi
+update_package_index "$PKG_UPDATE"
 
 # ── Install apt packages ─────────────────────
 install_pkg() {
@@ -240,7 +266,7 @@ if [ -z "$EZA_CANDIDATE" ] || [ "$EZA_CANDIDATE" = "(none)" ]; then
             echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
                 | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
             sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
-            $PKG_UPDATE
+            update_package_index "$PKG_UPDATE"
             success "eza repository added."
         else
             info "eza repository already configured."

@@ -107,6 +107,16 @@ In dry-run mode:
 - Tools are not checked for updates (reduces API calls)
 - All changes are logged as `[DRY-RUN]` messages
 
+### About apt/GPG warnings
+
+If your system has third-party apt repositories with broken or missing keys (for example `NO_PUBKEY` errors), the installer now:
+
+- Warns you about the repository signature issue
+- Continues using existing apt index files when possible
+- Proceeds with the rest of the setup instead of aborting immediately
+
+For a fully clean apt state, you should still fix the affected repository keys separately.
+
 ---
 
 ## tmux
