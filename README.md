@@ -36,6 +36,16 @@ Type `h` in any terminal to display a colour-coded cheatsheet of the most useful
 
 ---
 
+## Requirements
+
+- **OS:** Debian/Ubuntu (uses `apt` package manager)
+- **Tools:** `curl` and `sudo` access
+- **Shell:** `bash` (default on most Linux systems)
+
+**Note:** macOS and other Linux distributions are not currently supported by this script.
+
+---
+
 ## How to run
 
 Execute directly from GitHub — no need to clone the repo:
@@ -44,21 +54,58 @@ Execute directly from GitHub — no need to clone the repo:
 bash <(curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/install.sh)
 ```
 
-After the script finishes, reload your shell:
+**The installer is fully idempotent and safe to run repeatedly.**
 
-```bash
-source ~/.bashrc
+### Installation behavior
+
+- **First install:** Installs all tools and configures your shell
+- **Subsequent runs:** 
+  - Tools already installed are checked for updates and upgraded if available
+  - Config files (`starship.toml`, `.tmux.conf`) prompt you to keep local or replace with GitHub copy
+  - `.bashrc` entries are validated line-by-line — no duplicates even across multiple runs
+  - `$HOME/.local/bin` is added to PATH only once (idempotent)
+
+### Validation
+
+After installation completes, the script validates all tools:
+
+```
+─── Post-install validation ──────────────────
+  ✓ starship   starship 1.18.0
+  ✓ eza        eza 0.16.1
+  ✓ fzf        0.46.0
+  ✓ zoxide     0.9.0
+  ✓ batcat     0.24.0
+  ✓ tmux       tmux 3.3a
+  ✓ starship.toml deployed
+──────────────────────────────────────────────
 ```
 
-> **Requirements:** `curl` and `sudo` access. Targets Debian/Ubuntu systems (uses `apt`).
+Any tool marked with `✗` indicates an installation failure requiring manual review.
+
+### Interactive prompts (non dry-run mode)
+
+1. **tmux installation:** Asked once (skipped during `--dry-run`)
+2. **Config files:** If `~/.config/starship.toml` or `~/.tmux.conf` already exist:
+   ```
+   ~/.config/starship.toml already exists. Keep local file or replace with clean GitHub copy? [K/r]:
+   ```
+   - Press `K` (or just Enter) → keep your local customizations
+   - Press `r` → replace with GitHub version (backup created as `.bak`)
 
 ### Preview mode (dry-run)
 
-See exactly what the script would do without making any changes:
+See exactly what the script **would** do without making any changes or prompts:
 
 ```bash
 bash <(curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/install.sh) --dry-run
 ```
+
+In dry-run mode:
+- No prompts are shown (removes interactive delays)
+- No installations occur
+- Tools are not checked for updates (reduces API calls)
+- All changes are logged as `[DRY-RUN]` messages
 
 ---
 
@@ -116,30 +163,75 @@ Installation steps:
 
 ## Config files
 
-| File | Deployed to |
-|------|-------------|
-| `starship.toml` | `~/.config/starship.toml` |
-| `.tmux.conf` | `~/.tmux.conf` |
-| `tmux-start` | `~/.local/bin/tmux-start` (chmod +x) |
-| `show-help` | `~/.local/bin/show-help` (chmod +x) |
+| File | Deployed to | Behavior |
+|------|-------------|----------|
+| `starship.toml` | `~/.config/starship.toml` | Prompt if exists (keep/replace) |
+| `.tmux.conf` | `~/.tmux.conf` | Prompt if exists (keep/replace) |
+| `tmux-start` | `~/.local/bin/tmux-start` | Overwrite (always latest) |
+| `show-help` | `~/.local/bin/show-help` | Overwrite (always latest) |
 
-If either file already exists it is backed up with a `.bak` extension before being overwritten.
+### Handling existing config files
 
-To update configs manually at any time:
+If `~/.config/starship.toml` or `~/.tmux.conf` already exist:
+
+1. Installer prompts: **Keep local file or replace?**
+2. **K** (default) → Preserves your customizations
+3. **r** → Replaces with GitHub version + creates `.bak` backup
+
+This approach lets you maintain custom configurations across runs while staying up-to-date with improvements from the repo.
+
+### Manual updates
+
+To update configs directly without running the full installer:
 
 ```bash
+# Starship config
 curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/starship.toml \
     -o ~/.config/starship.toml
 
+# tmux config
 curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/.tmux.conf \
     -o ~/.tmux.conf
 
+# Helper scripts
 curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/tmux-start \
     -o ~/.local/bin/tmux-start && chmod +x ~/.local/bin/tmux-start
 
 curl -sSfL https://raw.githubusercontent.com/CarlosLongarela/cl-personal-term/main/show-help \
     -o ~/.local/bin/show-help && chmod +x ~/.local/bin/show-help
 ```
+
+---
+
+## Shell configuration (.bashrc)
+
+The installer manages your `~/.bashrc` intelligently:
+
+### What gets added
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+alias ls="eza --icons"
+alias ll="eza -lah --icons"
+alias tree="eza --tree"
+alias bat="batcat"  # or "bat" depending on system
+alias h="show-help"
+eval "$(zoxide init bash)"
+eval "$(fzf --bash)"
+eval "$(starship init bash)"
+if [ -z "$TMUX" ]; then
+    tmux-start
+fi
+```
+
+### Idempotent behavior
+
+- **No duplicates:** Lines are checked before adding (exact match lookup)
+- **Run as many times as you want:** Repeating the installer won't duplicate `eval` statements
+- **PATH handling:** If `$HOME/.local/bin` is already in PATH, it's not added again
+- **Marked block:** Entries are wrapped with start/end markers for easier maintenance
+
+This means you can safely run the installer multiple times without worrying about your `~/.bashrc` becoming cluttered with repeated init lines.
 
 ---
 

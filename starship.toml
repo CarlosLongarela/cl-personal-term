@@ -36,7 +36,7 @@ $character"""
 # catppuccin_frappe
 # catppuccin_latte
 # catppuccin_macchiato
-palette = 'catppuccin_latte'
+palette = 'catppuccin_mocha'
 
 # --- Prompt ---
 

@@ -48,14 +48,70 @@ run() {
     fi
 }
 
+version_lt() {
+    local v1="$1"
+    local v2="$2"
+    [ "$v1" != "$v2" ] && [ "$(printf '%s\n' "$v1" "$v2" | sort -V | head -n1)" = "$v1" ]
+}
+
+normalize_version() {
+    # Strip leading non-numeric prefix (like v1.2.3) and trailing metadata.
+    echo "$1" | sed -E 's/^[^0-9]*//; s/[^0-9.].*$//'
+}
+
+github_latest_tag() {
+    local repo="$1"
+    local response
+    response=$(curl -fsSL --max-time 5 "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null || echo "")
+    
+    if [ -z "$response" ]; then
+        return 1
+    fi
+    
+    echo "$response" \
+        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n1
+}
+
+ask_keep_or_replace() {
+    local item="$1"
+    local answer
+    echo -e "${BOLD}${item} already exists. Keep local file or replace with clean GitHub copy? [K/r]:${RESET} \c"
+    read -r answer </dev/tty || answer=""
+
+    case "${answer,,}" in
+        r|replace)
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
+append_line_if_missing() {
+    local line="$1"
+    local label="$2"
+
+    if grep -Fqx "$line" "$BASHRC" 2>/dev/null; then
+        info "$label already present in $BASHRC, skipping."
+        return
+    fi
+
+    echo "$line" >> "$BASHRC"
+    success "Added $label to $BASHRC."
+}
+
 $DRY_RUN && warning "Running in dry-run mode — no changes will be made.\n"
 
 # ── tmux prompt ──────────────────────────────
 # Default N — skip on remote servers where the local terminal handles multiplexing.
 INSTALL_TMUX=false
-echo -e "${BOLD}Install tmux + tmux-start? [y/N]:${RESET} \c"
-read -r tmux_answer </dev/tty
-[[ "${tmux_answer,,}" == "y" ]] && INSTALL_TMUX=true
+if ! $DRY_RUN; then
+    echo -e "${BOLD}Install tmux + tmux-start? [y/N]:${RESET} \c"
+    read -r tmux_answer </dev/tty
+    [[ "${tmux_answer,,}" == "y" ]] && INSTALL_TMUX=true
+fi
 if $INSTALL_TMUX; then
     info "tmux will be installed."
 else
@@ -96,11 +152,31 @@ fi
 # ── Install apt packages ─────────────────────
 install_pkg() {
     local name="$1"
-    info "Installing ${name}..."
-    if $DRY_RUN; then
-        dryrun "Would run: $PKG_INSTALL $name"
+    local installed_ver=""
+    local candidate_ver=""
+
+    installed_ver="$(dpkg-query -W -f='${Version}' "$name" 2>/dev/null || true)"
+    candidate_ver="$(apt-cache policy "$name" 2>/dev/null | awk '/Candidate:/ {print $2; exit}')"
+
+    if [ -z "$installed_ver" ]; then
+        info "Installing ${name}..."
+        if $DRY_RUN; then
+            dryrun "Would run: $PKG_INSTALL $name"
+        else
+            $PKG_INSTALL "$name"
+        fi
+        return
+    fi
+
+    if [ -n "$candidate_ver" ] && [ "$candidate_ver" != "(none)" ] && [ "$candidate_ver" != "$installed_ver" ]; then
+        info "${name} installed (${installed_ver}) and update available (${candidate_ver})."
+        if $DRY_RUN; then
+            dryrun "Would run: $PKG_INSTALL --only-upgrade $name"
+        else
+            $PKG_INSTALL --only-upgrade "$name"
+        fi
     else
-        $PKG_INSTALL "$name"
+        success "${name} already up to date (${installed_ver})."
     fi
 }
 
@@ -111,44 +187,99 @@ $INSTALL_TMUX && install_pkg tmux
 
 # ── Install zoxide ────────────────────────────
 info "Installing zoxide..."
-if command -v zoxide &>/dev/null || [ -x "$HOME/.local/bin/zoxide" ]; then
-    success "zoxide already installed, skipping."
+ZOXIDE_BIN=""
+if command -v zoxide &>/dev/null; then
+    ZOXIDE_BIN="$(command -v zoxide)"
+elif [ -x "$HOME/.local/bin/zoxide" ]; then
+    ZOXIDE_BIN="$HOME/.local/bin/zoxide"
+fi
+
+if [ -n "$ZOXIDE_BIN" ]; then
+    current_zoxide="$(normalize_version "$($ZOXIDE_BIN --version 2>/dev/null | awk '{print $2}' | head -n1)")"
+    latest_zoxide="$(normalize_version "$(github_latest_tag ajeetdsouza/zoxide 2>/dev/null || true)")"
+
+    if [ -n "$latest_zoxide" ] && [ -n "$current_zoxide" ] && version_lt "$current_zoxide" "$latest_zoxide"; then
+        info "zoxide installed (${current_zoxide}) and update available (${latest_zoxide}). Updating..."
+        if $DRY_RUN; then
+            dryrun "Would run: curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash"
+        else
+            if curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash; then
+                success "zoxide updated."
+            else
+                warning "Failed to update zoxide. Keeping current version."
+            fi
+        fi
+    elif [ -n "$latest_zoxide" ] && [ -n "$current_zoxide" ]; then
+        success "zoxide already up to date (${current_zoxide})."
+    else
+        warning "Could not determine zoxide latest version. Keeping current installation."
+    fi
 else
     if $DRY_RUN; then
         dryrun "Would run: curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash"
     else
-        curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+        if curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash; then
+            success "zoxide installed."
+        else
+            error "Failed to install zoxide."
+        fi
     fi
 fi
 
 # ── Install eza ───────────────────────────────
 info "Installing eza..."
-if command -v eza &>/dev/null; then
-    success "eza already installed, skipping."
-else
+EZA_CANDIDATE="$(apt-cache policy eza 2>/dev/null | awk '/Candidate:/ {print $2; exit}')"
+if [ -z "$EZA_CANDIDATE" ] || [ "$EZA_CANDIDATE" = "(none)" ]; then
     if $DRY_RUN; then
-        dryrun "Would add eza apt repository and install eza"
+        dryrun "Would add eza apt repository (if not already present)"
     else
-        sudo mkdir -p /etc/apt/keyrings
-        curl -sSfL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-        echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
-            | sudo tee /etc/apt/sources.list.d/gierens.list
-        sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
-        $PKG_UPDATE
-        $PKG_INSTALL eza
+        if [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
+            sudo mkdir -p /etc/apt/keyrings
+            curl -sSfL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
+                | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+            echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
+                | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
+            sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+            $PKG_UPDATE
+            success "eza repository added."
+        else
+            info "eza repository already configured."
+        fi
     fi
 fi
+install_pkg eza
 
 # ── Install Starship ──────────────────────────
 info "Installing starship..."
 if command -v starship &>/dev/null; then
-    success "starship already installed, skipping."
+    current_starship="$(normalize_version "$(starship --version 2>/dev/null | awk '{print $2}' | head -n1)")"
+    latest_starship="$(normalize_version "$(github_latest_tag starship/starship 2>/dev/null || true)")"
+
+    if [ -n "$latest_starship" ] && [ -n "$current_starship" ] && version_lt "$current_starship" "$latest_starship"; then
+        info "starship installed (${current_starship}) and update available (${latest_starship}). Updating..."
+        if $DRY_RUN; then
+            dryrun "Would run: curl -sSf https://starship.rs/install.sh | sh -s -- --yes"
+        else
+            if curl -sSf https://starship.rs/install.sh | sh -s -- --yes; then
+                success "starship updated."
+            else
+                warning "Failed to update starship. Keeping current version."
+            fi
+        fi
+    elif [ -n "$latest_starship" ] && [ -n "$current_starship" ]; then
+        success "starship already up to date (${current_starship})."
+    else
+        warning "Could not determine starship latest version. Keeping current installation."
+    fi
 else
     if $DRY_RUN; then
         dryrun "Would run: curl -sSf https://starship.rs/install.sh | sh -s -- --yes"
     else
-        curl -sSf https://starship.rs/install.sh | sh -s -- --yes
+        if curl -sSf https://starship.rs/install.sh | sh -s -- --yes; then
+            success "starship installed."
+        else
+            error "Failed to install starship."
+        fi
     fi
 fi
 
@@ -158,13 +289,20 @@ TOML_DST="$HOME/.config/starship.toml"
 if ! $DRY_RUN; then
     mkdir -p "$HOME/.config"
     if [ -f "$TOML_DST" ]; then
-        warning "~/.config/starship.toml already exists — backing up to starship.toml.bak"
-        cp "$TOML_DST" "${TOML_DST}.bak"
+        if ask_keep_or_replace "~/.config/starship.toml"; then
+            info "Keeping local ~/.config/starship.toml"
+        else
+            warning "Replacing ~/.config/starship.toml (backup: starship.toml.bak)"
+            cp "$TOML_DST" "${TOML_DST}.bak"
+            curl -sSfL "$REPO_RAW/starship.toml" -o "$TOML_DST"
+            success "starship.toml deployed."
+        fi
+    else
+        curl -sSfL "$REPO_RAW/starship.toml" -o "$TOML_DST"
+        success "starship.toml deployed."
     fi
-    curl -sSfL "$REPO_RAW/starship.toml" -o "$TOML_DST"
-    success "starship.toml deployed."
 else
-    dryrun "Would deploy starship.toml to $TOML_DST"
+    dryrun "Would deploy starship.toml to $TOML_DST (if it exists, installer would ask keep/replace)"
 fi
 
 # ── Deploy .tmux.conf and tmux-start ─────────
@@ -173,13 +311,20 @@ if $INSTALL_TMUX; then
     TMUX_DST="$HOME/.tmux.conf"
     if ! $DRY_RUN; then
         if [ -f "$TMUX_DST" ]; then
-            warning "~/.tmux.conf already exists — backing up to .tmux.conf.bak"
-            cp "$TMUX_DST" "${TMUX_DST}.bak"
+            if ask_keep_or_replace "~/.tmux.conf"; then
+                info "Keeping local ~/.tmux.conf"
+            else
+                warning "Replacing ~/.tmux.conf (backup: .tmux.conf.bak)"
+                cp "$TMUX_DST" "${TMUX_DST}.bak"
+                curl -sSfL "$REPO_RAW/.tmux.conf" -o "$TMUX_DST"
+                success ".tmux.conf deployed."
+            fi
+        else
+            curl -sSfL "$REPO_RAW/.tmux.conf" -o "$TMUX_DST"
+            success ".tmux.conf deployed."
         fi
-        curl -sSfL "$REPO_RAW/.tmux.conf" -o "$TMUX_DST"
-        success ".tmux.conf deployed."
     else
-        dryrun "Would deploy .tmux.conf to $TMUX_DST"
+        dryrun "Would deploy .tmux.conf to $TMUX_DST (if it exists, installer would ask keep/replace)"
     fi
 
     info "Deploying tmux-start to ~/.local/bin..."
@@ -215,39 +360,23 @@ if command -v bat &>/dev/null && ! command -v batcat &>/dev/null; then
 fi
 info "bat alias will point to: ${BAT_CMD}"
 
-# ── Detect fzf shell integration paths ───────
-FZF_KEYBINDINGS=""
-for p in \
-    /usr/share/doc/fzf/examples/key-bindings.bash \
-    /usr/share/fzf/key-bindings.bash \
-    /usr/share/fzf/shell/key-bindings.bash; do
-    if [ -f "$p" ]; then
-        FZF_KEYBINDINGS="$p"
-        break
-    fi
-done
-
-FZF_COMPLETION=""
-for p in \
-    /usr/share/bash-completion/completions/fzf \
-    /usr/share/fzf/completion.bash \
-    /usr/share/fzf/shell/completion.bash; do
-    if [ -f "$p" ]; then
-        FZF_COMPLETION="$p"
-        break
-    fi
-done
-
-[ -n "$FZF_KEYBINDINGS" ] && info "fzf key-bindings found: $FZF_KEYBINDINGS" \
-    || warning "fzf key-bindings file not found — keybindings will not be enabled."
-[ -n "$FZF_COMPLETION" ]  && info "fzf completion  found: $FZF_COMPLETION" \
-    || warning "fzf completion file not found — completion will not be enabled."
+# ── Check if fzf is available ──────────────────
+if command -v fzf &>/dev/null; then
+    info "fzf found — will set up integration via eval \"\$(fzf --bash)\""
+else
+    warning "fzf not found — bash integration will be skipped."
+fi
 
 # ── Write .bashrc block ───────────────────────
 if grep -q "$MARKER_START" "$BASHRC" 2>/dev/null; then
-    warning "Existing cl-personal-term block found in $BASHRC — removing before re-applying."
+    warning "Existing cl-personal-term block found in $BASHRC — updating incrementally."
     if ! $DRY_RUN; then
         sed -i "/$MARKER_START/,/$MARKER_END/d" "$BASHRC"
+    fi
+else
+    # Ensure markers exist for future runs
+    if ! $DRY_RUN; then
+        true  # Will add markers during bashrc update
     fi
 fi
 
@@ -256,89 +385,170 @@ info "Writing aliases and shell init to $BASHRC..."
 if $DRY_RUN; then
     dryrun "Would append cl-personal-term block to $BASHRC"
     dryrun "  bat alias      → $BAT_CMD"
-    dryrun "  fzf keybindings→ ${FZF_KEYBINDINGS:-not found, skipped}"
-    dryrun "  fzf completion → ${FZF_COMPLETION:-not found, skipped}"
+    dryrun "  fzf integration→ $(command -v fzf &>/dev/null && echo "yes" || echo "no (skipped)")"
     dryrun "  tmux auto-start→ $($INSTALL_TMUX && echo "yes" || echo "no (skipped)")"
 else
-    # ── Static opening block ──────────────────
-    cat >> "$BASHRC" << EOF
-$MARKER_START
+    touch "$BASHRC"
+    {
+        echo "$MARKER_START"
+        echo ""
+    } >> "$BASHRC"
 
-# ── PATH: local bin (zoxide, etc.) ───────────
-export PATH="\$HOME/.local/bin:\$PATH"
-
+    if ! grep -Fq '/usr/share/bash-completion/bash_completion' "$BASHRC" 2>/dev/null; then
+        cat >> "$BASHRC" << 'EOF'
 # ── bash-completion ───────────────────────────
 if [ -f /usr/share/bash-completion/bash_completion ]; then
     source /usr/share/bash-completion/bash_completion
 fi
 
-# ── Aliases ───────────────────────────────────
-alias ls="eza --icons"
-alias ll="eza -lah --icons"
-alias tree="eza --tree"
-alias bat="$BAT_CMD"
-alias h="show-help"
-
-# ── zoxide (replaces cd) ──────────────────────
-eval "\$(zoxide init bash)"
 EOF
-
-    # ── fzf key-bindings (optional) ──────────
-    if [ -n "$FZF_KEYBINDINGS" ]; then
-        cat >> "$BASHRC" << EOF
-
-# ── fzf key bindings ─────────────────────────
-source "$FZF_KEYBINDINGS"
-EOF
+        success "Added bash-completion block to $BASHRC."
+    else
+        info "bash-completion block already present in $BASHRC, skipping."
     fi
 
-    # ── fzf completion (optional) ─────────────
-    if [ -n "$FZF_COMPLETION" ]; then
-        cat >> "$BASHRC" << EOF
+    {
+        echo "# ── PATH: local bin (zoxide, etc.) ───────────"
+    } >> "$BASHRC"
+    if ! grep -Fqx 'export PATH="$HOME/.local/bin:$PATH"' "$BASHRC" 2>/dev/null; then
+        if ! grep -Fq '$HOME/.local/bin' "$BASHRC" 2>/dev/null; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASHRC"
+            success "Added PATH export to $BASHRC."
+        else
+            info "PATH already contains $HOME/.local/bin, skipping."
+        fi
+    else
+        info "PATH export already present in $BASHRC, skipping."
+    fi
+    echo "" >> "$BASHRC"
 
-# ── fzf completion ────────────────────────────
-source "$FZF_COMPLETION"
-EOF
+    {
+        echo "# ── Aliases ───────────────────────────────────"
+    } >> "$BASHRC"
+    append_line_if_missing 'alias ls="eza --icons"' "ls alias"
+    append_line_if_missing 'alias ll="eza -lah --icons"' "ll alias"
+    append_line_if_missing 'alias tree="eza --tree"' "tree alias"
+    append_line_if_missing "alias bat=\"$BAT_CMD\"" "bat alias"
+    append_line_if_missing 'alias h="show-help"' "h alias"
+    echo "" >> "$BASHRC"
+
+    {
+        echo "# ── zoxide (replaces cd) ──────────────────────"
+    } >> "$BASHRC"
+    append_line_if_missing 'eval "$(zoxide init bash)"' "zoxide init"
+    echo "" >> "$BASHRC"
+
+    if command -v fzf &>/dev/null; then
+        {
+            echo "# ── fzf key bindings and completion ──────────"
+        } >> "$BASHRC"
+        append_line_if_missing 'eval "$(fzf --bash)"' "fzf integration"
+        echo "" >> "$BASHRC"
     fi
 
-    # ── tmux auto-start (only if tmux was installed) ──
     if $INSTALL_TMUX; then
-        cat >> "$BASHRC" << 'EOF'
-
+        if grep -Fq 'tmux-start' "$BASHRC" 2>/dev/null; then
+            info "tmux auto-start already present in $BASHRC, skipping."
+        else
+            cat >> "$BASHRC" << 'EOF'
 # ── tmux auto-start ───────────────────────────
 if [ -z "$TMUX" ]; then
     tmux-start
 fi
+
 EOF
+            success "Added tmux auto-start block to $BASHRC."
+        fi
     fi
 
-    # ── Starship prompt ───────────────────────────
-    cat >> "$BASHRC" << 'EOF'
+    {
+        echo "# ── Starship prompt ───────────────────────────"
+    } >> "$BASHRC"
+    append_line_if_missing 'eval "$(starship init bash)"' "starship init"
 
-# ── Starship prompt ───────────────────────────
-eval "$(starship init bash)"
-EOF
-
-    echo "$MARKER_END" >> "$BASHRC"
+    {
+        echo ""
+        echo "$MARKER_END"
+    } >> "$BASHRC"
     success ".bashrc updated."
 fi
 
-# ── Version summary ───────────────────────────
+# ── Version summary and post-install validation ──
 if ! $DRY_RUN; then
     export PATH="$HOME/.local/bin:$PATH"
     echo ""
-    echo -e "${BOLD}─── Installed versions ──────────────────────────${RESET}"
-    command -v starship &>/dev/null && echo -e "  starship  $(starship --version)"                    || echo -e "  starship  ${RED}not found${RESET}"
-    command -v batcat   &>/dev/null && echo -e "  batcat    $(batcat --version 2>/dev/null | head -1)" || true
-    command -v bat      &>/dev/null && echo -e "  bat       $(bat --version 2>/dev/null | head -1)"    || true
-    command -v eza      &>/dev/null && echo -e "  eza       $(eza --version | head -1)"                || echo -e "  eza       ${RED}not found${RESET}"
-    command -v fzf      &>/dev/null && echo -e "  fzf       $(fzf --version)"                          || echo -e "  fzf       ${RED}not found${RESET}"
-    command -v zoxide   &>/dev/null && echo -e "  zoxide    $(zoxide --version)"                       || \
-        { [ -x "$HOME/.local/bin/zoxide" ] && echo -e "  zoxide    $("$HOME/.local/bin/zoxide" --version)"; } || \
-        echo -e "  zoxide    ${RED}not found${RESET}"
-    $INSTALL_TMUX && { command -v tmux &>/dev/null && echo -e "  tmux      $(tmux -V)" || echo -e "  tmux      ${RED}not found${RESET}"; }
-    echo -e "${BOLD}────────────────────────────────────────────────${RESET}"
-    echo ""
+    echo -e "${BOLD}─── Post-install validation ──────────────────${RESET}"
+    
+    # Track any failures
+    INSTALL_FAILED=0
+    
+    # Core tools
+    if command -v starship &>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} starship  $(starship --version)"
+    else
+        echo -e "  ${RED}✗${RESET} starship  not found (installation failed)"
+        INSTALL_FAILED=1
+    fi
+    
+    if command -v eza &>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} eza       $(eza --version | head -1)"
+    else
+        echo -e "  ${RED}✗${RESET} eza       not found (installation failed)"
+        INSTALL_FAILED=1
+    fi
+    
+    if command -v fzf &>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} fzf       $(fzf --version)"
+    else
+        echo -e "  ${RED}✗${RESET} fzf       not found (installation failed)"
+        INSTALL_FAILED=1
+    fi
+    
+    if command -v zoxide &>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} zoxide    $(zoxide --version)"
+    elif [ -x \"$HOME/.local/bin/zoxide\" ]; then
+        echo -e \"  ${GREEN}✓${RESET} zoxide    $($HOME/.local/bin/zoxide --version)\"
+    else
+        echo -e "  ${RED}✗${RESET} zoxide    not found (installation failed)"
+        INSTALL_FAILED=1
+    fi
+    
+    # bat (may be bat or batcat)
+    if command -v bat &>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} bat       $(bat --version 2>/dev/null | head -1)"
+    elif command -v batcat &>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} batcat    $(batcat --version 2>/dev/null | head -1)"
+    else
+        echo -e "  ${YELLOW}!${RESET} bat/batcat not found"
+    fi
+    
+    # Optional: tmux
+    if [ \"$INSTALL_TMUX\" = true ]; then
+        if command -v tmux &>/dev/null; then
+            echo -e \"  ${GREEN}✓${RESET} tmux      $(tmux -V)\"
+        else
+            echo -e \"  ${RED}✗${RESET} tmux      not found (installation failed)\"
+            INSTALL_FAILED=1
+        fi
+    fi
+    
+    # Optional: starship config
+    if [ -f \"$HOME/.config/starship.toml\" ]; then
+        echo -e \"  ${GREEN}✓${RESET} starship.toml deployed\"
+    else
+        echo -e \"  ${YELLOW}!${RESET} starship.toml not found (may be using defaults)\"
+    fi
+    
+    echo -e \"${BOLD}──────────────────────────────────────────────${RESET}\"
+    
+    if [ $INSTALL_FAILED -eq 1 ]; then
+        echo \"\"
+        warning \"Some tools failed to install. Please review the output above.\"
+    else
+        echo \"\"
+        success \"All core tools installed and validated successfully!\"
+    fi
+    echo \"\"
 fi
 
-success "All done! Run 'source ~/.bashrc' or open a new terminal to apply changes."
+success \"All done! Run 'source ~/.bashrc' or open a new terminal to apply changes.\"
