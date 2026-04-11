@@ -266,7 +266,7 @@ fi
 
 # ── Install eza ───────────────────────────────
 info "Installing eza..."
-EZA_CANDIDATE="$(apt-cache policy eza 2>/dev/null | awk '/Candidate:/ {print $2; exit}')"
+EZA_CANDIDATE="$(apt-cache policy eza 2>/dev/null | awk '/Candidate:/ {print $2; exit}' || true)"
 if [ -z "$EZA_CANDIDATE" ] || [ "$EZA_CANDIDATE" = "(none)" ]; then
     if $DRY_RUN; then
         dryrun "Would add eza apt repository (if not already present)"
