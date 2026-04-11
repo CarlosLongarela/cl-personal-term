@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eEuo pipefail
 
 # ─────────────────────────────────────────────
 #  Terminal Setup Script
@@ -191,7 +191,7 @@ install_pkg() {
     info "Checking package '${name}'..."
 
     installed_ver="$(dpkg-query -W -f='${Version}' "$name" 2>/dev/null || true)"
-    candidate_ver="$(apt-cache policy "$name" 2>/dev/null | awk '/Candidate:/ {print $2; exit}')"
+    candidate_ver="$(apt-cache policy "$name" 2>/dev/null | awk '/Candidate:/ {print $2; exit}' || true)"
 
     if [ -z "$installed_ver" ]; then
         info "Installing ${name}..."
