@@ -402,9 +402,18 @@ if command -v bat &>/dev/null && ! command -v batcat &>/dev/null; then
 fi
 info "bat alias will point to: ${BAT_CMD}"
 
-# ── Check if fzf is available ──────────────────
+# ── Check if fzf is available and determine integration method ───
+FZF_INIT_METHOD=""
 if command -v fzf &>/dev/null; then
-    info "fzf found — will set up integration via eval \"\$(fzf --bash)\""
+    _fzf_ver="$(fzf --version 2>/dev/null | awk '{print $1}')"
+    _fzf_ver_norm="$(normalize_version "$_fzf_ver")"
+    if version_lt "$_fzf_ver_norm" "0.48.0"; then
+        FZF_INIT_METHOD="legacy"
+        info "fzf ${_fzf_ver} found — will use legacy key-bindings scripts (--bash requires >= 0.48.0)."
+    else
+        FZF_INIT_METHOD="bash"
+        info "fzf ${_fzf_ver} found — will set up integration via eval \"\$(fzf --bash)\"."
+    fi
 else
     warning "fzf not found — bash integration will be skipped."
 fi
@@ -427,7 +436,7 @@ info "Writing aliases and shell init to $BASHRC..."
 if $DRY_RUN; then
     dryrun "Would append cl-personal-term block to $BASHRC"
     dryrun "  bat alias      → $BAT_CMD"
-    dryrun "  fzf integration→ $(command -v fzf &>/dev/null && echo "yes" || echo "no (skipped)")"
+    dryrun "  fzf integration→ ${FZF_INIT_METHOD:-no (skipped)} (method: ${FZF_INIT_METHOD:-none})"
     dryrun "  tmux auto-start→ $($INSTALL_TMUX && echo "yes" || echo "no (skipped)")"
 else
     touch "$BASHRC"
@@ -480,11 +489,16 @@ EOF
     append_line_if_missing 'eval "$(zoxide init bash)"' "zoxide init"
     echo "" >> "$BASHRC"
 
-    if command -v fzf &>/dev/null; then
+    if [ -n "$FZF_INIT_METHOD" ]; then
         {
             echo "# ── fzf key bindings and completion ──────────"
         } >> "$BASHRC"
-        append_line_if_missing 'eval "$(fzf --bash)"' "fzf integration"
+        if [ "$FZF_INIT_METHOD" = "bash" ]; then
+            append_line_if_missing 'eval "$(fzf --bash)"' "fzf integration"
+        else
+            append_line_if_missing '[ -f /usr/share/doc/fzf/examples/key-bindings.bash ] && source /usr/share/doc/fzf/examples/key-bindings.bash' "fzf key-bindings"
+            append_line_if_missing '[ -f /usr/share/doc/fzf/examples/completion.bash ] && source /usr/share/doc/fzf/examples/completion.bash' "fzf completion"
+        fi
         echo "" >> "$BASHRC"
     fi
 
