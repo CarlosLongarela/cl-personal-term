@@ -191,7 +191,9 @@ install_pkg() {
     info "Checking package '${name}'..."
 
     installed_ver="$(dpkg-query -W -f='${Version}' "$name" 2>/dev/null || true)"
-    candidate_ver="$(apt-cache policy "$name" 2>/dev/null | awk '/Candidate:/ {print $2; exit}' || true)"
+    local _apt_out=""
+    _apt_out="$(apt-cache policy "$name" 2>/dev/null)" || true
+    candidate_ver="$(printf '%s\n' "$_apt_out" | awk '/Candidate:/ {print $2}')"
 
     if [ -z "$installed_ver" ]; then
         info "Installing ${name}..."
@@ -266,7 +268,9 @@ fi
 
 # ── Install eza ───────────────────────────────
 info "Installing eza..."
-EZA_CANDIDATE="$(apt-cache policy eza 2>/dev/null | awk '/Candidate:/ {print $2; exit}' || true)"
+_eza_apt_out="$(apt-cache policy eza 2>/dev/null)" || true
+EZA_CANDIDATE="$(printf '%s\n' "$_eza_apt_out" | awk '/Candidate:/ {print $2}')"
+unset _eza_apt_out
 if [ -z "$EZA_CANDIDATE" ] || [ "$EZA_CANDIDATE" = "(none)" ]; then
     if $DRY_RUN; then
         dryrun "Would add eza apt repository (if not already present)"
