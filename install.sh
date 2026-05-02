@@ -483,12 +483,6 @@ EOF
     append_line_if_missing 'alias h="show-help"' "h alias"
     echo "" >> "$BASHRC"
 
-    {
-        echo "# ── zoxide (replaces cd) ──────────────────────"
-    } >> "$BASHRC"
-    append_line_if_missing 'eval "$(zoxide init bash)"' "zoxide init"
-    echo "" >> "$BASHRC"
-
     if [ -n "$FZF_INIT_METHOD" ]; then
         {
             echo "# ── fzf key bindings and completion ──────────"
@@ -521,6 +515,12 @@ EOF
         echo "# ── Starship prompt ───────────────────────────"
     } >> "$BASHRC"
     append_line_if_missing 'eval "$(starship init bash)"' "starship init"
+
+    {
+        echo ""
+        echo "# ── zoxide (replaces cd) ──────────────────────"
+    } >> "$BASHRC"
+    append_line_if_missing 'eval "$(zoxide init bash)"' "zoxide init"
 
     {
         echo ""
