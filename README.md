@@ -39,7 +39,7 @@ Type `h` in any terminal to display a colour-coded cheatsheet of the most useful
 ## Requirements
 
 - **OS:** Debian/Ubuntu (uses `apt` package manager)
-- **Tools:** `curl` and `sudo` access
+- **Tools:** `curl`, and either root or `sudo` access
 - **Shell:** `bash` (default on most Linux systems)
 
 **Note:** macOS and other Linux distributions are not currently supported by this script.

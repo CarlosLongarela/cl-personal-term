@@ -130,13 +130,23 @@ BASHRC="$HOME/.bashrc"
 MARKER_START="# >>> cl-personal-term >>>"
 MARKER_END="# <<< cl-personal-term <<<"
 
+# ── Privilege escalation ─────────────────────
+# Root does not need sudo (and minimal Debian installs often lack it).
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+elif command -v sudo &>/dev/null; then
+    SUDO="sudo"
+else
+    error "Not running as root and 'sudo' is not installed. Run as root or install sudo."
+fi
+
 # ── Detect package manager ───────────────────
 if command -v apt-get &>/dev/null; then
-    PKG_UPDATE="sudo apt-get update -y"
-    PKG_INSTALL="sudo apt-get install -y"
+    PKG_UPDATE="${SUDO:+$SUDO }apt-get update -y"
+    PKG_INSTALL="${SUDO:+$SUDO }apt-get install -y"
 elif command -v apt &>/dev/null; then
-    PKG_UPDATE="sudo apt update -y"
-    PKG_INSTALL="sudo apt install -y"
+    PKG_UPDATE="${SUDO:+$SUDO }apt update -y"
+    PKG_INSTALL="${SUDO:+$SUDO }apt install -y"
 else
     error "No supported package manager found (apt/apt-get). This script targets Debian/Ubuntu systems."
 fi
@@ -276,12 +286,13 @@ if [ -z "$EZA_CANDIDATE" ] || [ "$EZA_CANDIDATE" = "(none)" ]; then
         dryrun "Would add eza apt repository (if not already present)"
     else
         if [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
-            sudo mkdir -p /etc/apt/keyrings
+            command -v gpg &>/dev/null || install_pkg gpg
+            $SUDO mkdir -p /etc/apt/keyrings
             curl -sSfL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-                | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+                | $SUDO gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
             echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
-                | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
-            sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+                | $SUDO tee /etc/apt/sources.list.d/gierens.list >/dev/null
+            $SUDO chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
             update_package_index "$PKG_UPDATE"
             success "eza repository added."
         else
